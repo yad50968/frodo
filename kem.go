@@ -33,9 +33,9 @@ func (param *Parameters) EncapsKeyGen() (pk *EncapsPublicKey, sk *EncapsSecretKe
 
 	pk, sk = new(EncapsPublicKey), new(EncapsSecretKey)
 
-	rLen := 2 * param.no * param.n * param.lenX
-	seedSE, z := uniform(param.lseedSE+1), uniform(param.lenz)
-	sk.SeedS = uniform(param.lens)
+	rLen := 8 * param.no * param.n
+	seedSE, z := uniform(param.l+1), uniform(param.l)
+	sk.SeedS = uniform(param.l)
 
 	seedSE[0] = 0x5f
 	pk.SeedA = param.shake(z, param.lseedA)
@@ -54,7 +54,7 @@ func (param *Parameters) EncapsKeyGen() (pk *EncapsPublicKey, sk *EncapsSecretKe
 	pkh = append(pkh, pk.SeedA...)
 	pkh = append(pkh, pk.B...)
 
-	sk.Pkh = param.shake(pkh, param.lenpkh)
+	sk.Pkh = param.shake(pkh, param.l)
 	sk.SeedA = pk.SeedA
 	sk.B = pk.B
 
@@ -66,22 +66,22 @@ func (param *Parameters) Encaps(pk *EncapsPublicKey) (ct *EncapsCipherText, ss [
 
 	ct = new(EncapsCipherText)
 
-	rLen := ((param.m*param.no)*2 + param.n*param.m) * param.lenX
-	m := uniform(param.lenM)
+	rLen := (param.m*param.no)*8 + param.n*param.m*4
+	m := uniform(param.l)
 
 	var pKey, seedSE []byte
 	pKey = append(pKey, pk.SeedA...)
 	pKey = append(pKey, pk.B...)
 
-	pkh := param.shake(pKey, param.lenpkh)
+	pkh := param.shake(pKey, param.l)
 	pkh = append(pkh, m...)
-	seed := param.shake(pkh, param.lseedSE+param.lenk)
+	seed := param.shake(pkh, param.l*2)
 
 	seedSE = append(seedSE, []byte{0x96}...)
-	seedSE = append(seedSE, seed[:(param.lseedSE)]...)
+	seedSE = append(seedSE, seed[:(param.l)]...)
 	r := param.shake(seedSE, rLen)
 
-	rLen = param.m * param.no * param.lenX
+	rLen = param.m * param.no * 4
 	S1 := param.SampleMatrix(r[:rLen], param.m, param.no)
 	E1 := param.SampleMatrix(r[rLen:2*rLen], param.m, param.no)
 	E2 := param.SampleMatrix(r[2*rLen:], param.m, param.n)
@@ -97,12 +97,12 @@ func (param *Parameters) Encaps(pk *EncapsPublicKey) (ct *EncapsCipherText, ss [
 	ct.C2 = param.Pack(C)
 
 	var temp, k []byte
-	k = append(k, seed[(param.lseedSE):]...)
+	k = append(k, seed[(param.l):]...)
 	temp = append(temp, ct.C1...)
 	temp = append(temp, ct.C2...)
 	temp = append(temp, k...)
 
-	ss = param.shake(temp, param.lenss)
+	ss = param.shake(temp, param.l)
 
 	return
 }
@@ -120,15 +120,15 @@ func (param *Parameters) Decaps(ct *EncapsCipherText, sk *EncapsSecretKey) (ss [
 	pkh = append(pkh, sk.Pkh...)
 	pkh = append(pkh, m1...)
 
-	seed := param.shake(pkh, param.lseedSE+param.lenk)
+	seed := param.shake(pkh, param.l*2)
 
 	seedSE = append(seedSE, []byte{0x96}...)
-	seedSE = append(seedSE, seed[:param.lseedSE]...)
+	seedSE = append(seedSE, seed[:param.l]...)
 
-	rLen := (2*param.no + param.n) * param.m * param.lenX
+	rLen := (2*param.no + param.n) * param.m * 4
 	r := param.shake(seedSE, rLen)
 
-	rLen = param.m * param.no * param.lenX
+	rLen = param.m * param.no * 4
 	S1 := param.SampleMatrix(r[:rLen], param.m, param.no)
 	E1 := param.SampleMatrix(r[rLen:2*rLen], param.m, param.no)
 	E2 := param.SampleMatrix(r[2*rLen:], param.m, param.n)
@@ -145,13 +145,13 @@ func (param *Parameters) Decaps(ct *EncapsCipherText, sk *EncapsSecretKey) (ss [
 	res = append(res, ct.C2...)
 
 	if eqMatrices(B1, B2) == true && eqMatrices(C, C1) == true {
-		k1 = append(k1, seed[(param.lseedSE):]...)
+		k1 = append(k1, seed[(param.l):]...)
 		res = append(res, k1...)
 	} else {
 		res = append(res, sk.SeedS...)
 	}
 
-	ss = param.shake(res, param.lenss)
+	ss = param.shake(res, param.l)
 
 	return
 }

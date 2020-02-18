@@ -1,5 +1,7 @@
 package frodo
 
+import "encoding/binary"
+
 // Frodo interface
 type Frodo interface {
 	Encode(k []byte) [][]uint16                   // Encode encodes an integer 0 ≤ k < 2^B as an element in Zq by multiplying it by q/2B = 2^(D−B): ec(k) := k·q/2^B
@@ -13,20 +15,13 @@ type Frodo interface {
 
 // Parameters of frodo KEM mechanism
 type Parameters struct {
-	no      int      		// n ≡ 0 (mod 8) the main parameter
-	q       uint16   		// a power-of-two integer modulus with exponent D ≤ 16 !! minus one for bit masking
-	D       int      		// a power 
-	m, n    int      		// integer matrix dimensions with
-	B       int      		// the number of bits encoded in each matrix entry
-	l       int      		// B·m·n, the length of bit strings that are encoded as m-by-n matrices
-	lseedA  int      		// the byte length of seed used for pseudorandom pk-matrix generation
-	lseedSE int      		// the byte length of seed used for pseudorandom bit generation for error sampling
-	lens, lenz, lenpkh int  // the byte length of seeds used for generating key pairs (KEM)
-	lenk    int      		// the byte length of seed used for generating seedSE in Encaps (KEM)
-	lenss   int      		// the byte length of secret ss (KEM)
-	lenX    int      		// the byte length of χ distribution
-	X       []uint16 		// a probability distribution on Z, rounded Gaussian distribution
-	lenM    int      		// byte length of message
+	no     int    // n ≡ 0 (mod 8) the main parameter
+	q      uint16 // a power-of-two integer modulus with exponent D ≤ 16 !! minus one for bit masking
+	D      int    // a power
+	m, n   int    // integer matrix dimensions with
+	B      int    // the number of bits encoded in each matrix entry
+	l      int    // B·m·n, the length of bit strings that are encoded as m-by-n matrices
+	lseedA int    // the byte length of public matrix A
 }
 
 // Frodo640 returns Parameters struct no.640
@@ -40,17 +35,8 @@ func Frodo640() *Parameters {
 	param.B = 2
 	param.m = 8
 	param.n = 8
-	param.lseedA = 16 
-	param.lseedSE = 16
-	param.lenM = 16
-	param.lens = 16
-	param.lenk = 16
-	param.lenz = 16
-	param.lenpkh = 16
-	param.lenss = 16
-	param.lenX = 2
+	param.lseedA = 16
 	param.l = 16
-	param.X = []uint16{4643, 13363, 20579, 25843, 29227, 31145, 32103, 32525, 32689, 32745, 32762, 32766, 32767}
 
 	return param
 }
@@ -67,16 +53,7 @@ func Frodo976() *Parameters {
 	param.m = 8
 	param.n = 8
 	param.lseedA = 16
-	param.lseedSE = 24
-	param.lenM = 24
-	param.lens = 24
-	param.lenk = 24
-	param.lenz = 24
-	param.lenpkh = 24
-	param.lenss = 24
-	param.lenX = 2
 	param.l = 24
-	param.X = []uint16{5638, 15915, 23689, 28571, 31116, 32217, 32613, 32731, 32760, 32766, 32767}
 
 	return param
 }
@@ -93,21 +70,12 @@ func Frodo1344() *Parameters {
 	param.m = 8
 	param.n = 8
 	param.lseedA = 16
-	param.lseedSE = 32
-	param.lenM = 32
-	param.lens = 32
-	param.lenk = 32
-	param.lenz = 32
-	param.lenpkh = 32
-	param.lenss = 32
-	param.lenX = 2
 	param.l = 32
-	param.X = []uint16{9142, 23462, 30338, 32361, 32725, 32765, 32767}
 
 	return param
 }
 
-// Encode encodes an integer 0 ≤ k < 2^B as an element in Zq 
+// Encode encodes an integer 0 ≤ k < 2^B as an element in Zq
 // by multiplying it by q/2B = 2^(D−B): ec(k) := k·q/2^B
 func (param *Parameters) Encode(k []byte) [][]uint16 {
 
@@ -201,21 +169,6 @@ func (param *Parameters) Gen(seed []byte) [][]uint16 {
 	return A
 }
 
-// Sample returns a sample e from the distribution χ
-func (param *Parameters) Sample(r uint16) uint16 {
-
-	e, t := uint16(0), r>>1
-	for z := 0; z < len(param.X)-1; z++ {
-		if t > param.X[z] {
-			e++
-		}
-	}
-	if r&1 != 0 && e != 0 {
-		e = (param.q - e + 1)
-	}
-	return e
-}
-
 // SampleMatrix sample the n1-by-n2 matrix entry
 func (param *Parameters) SampleMatrix(r []byte, n1, n2 int) [][]uint16 {
 
@@ -223,9 +176,16 @@ func (param *Parameters) SampleMatrix(r []byte, n1, n2 int) [][]uint16 {
 	for i := 0; i < n1; i++ {
 		E[i] = make([]uint16, n2)
 		for j := 0; j < n2; j++ {
-			index := (i*n2 + j) * 2
-			E[i][j] = param.Sample((uint16(r[index]) << 8) | uint16(r[index+1]))
+			t := binary.LittleEndian.Uint32(r[4*(i*n2+j):])
+			d := uint32(0)
+			for j := uint(0); j < 8; j++ {
+				d += (t >> j) & 0x01010101
+			}
+			a := ((d >> 8) & 0xff) + (d & 0xff)
+			b := (d >> 24) + ((d >> 16) & 0xff)
+			E[i][j] = 0xffff - uint16(b) + uint16(a) + 1
 		}
 	}
+
 	return E
 }
