@@ -33,7 +33,7 @@ func (param *Parameters) EncapsKeyGen() (pk *EncapsPublicKey, sk *EncapsSecretKe
 
 	pk, sk = new(EncapsPublicKey), new(EncapsSecretKey)
 
-	rLen := 8 * param.no * param.n
+	rLen := 4 * param.no * param.n
 	seedSE, z := uniform(param.l+1), uniform(param.l)
 	sk.SeedS = uniform(param.l)
 
@@ -66,7 +66,7 @@ func (param *Parameters) Encaps(pk *EncapsPublicKey) (ct *EncapsCipherText, ss [
 
 	ct = new(EncapsCipherText)
 
-	rLen := (param.m*param.no)*8 + param.n*param.m*4
+	rLen := (param.m*param.no)*4 + param.n*param.m*2
 	m := uniform(param.l)
 
 	var pKey, seedSE []byte
@@ -81,7 +81,7 @@ func (param *Parameters) Encaps(pk *EncapsPublicKey) (ct *EncapsCipherText, ss [
 	seedSE = append(seedSE, seed[:(param.l)]...)
 	r := param.shake(seedSE, rLen)
 
-	rLen = param.m * param.no * 4
+	rLen = param.m * param.no * 2
 	S1 := param.SampleMatrix(r[:rLen], param.m, param.no)
 	E1 := param.SampleMatrix(r[rLen:2*rLen], param.m, param.no)
 	E2 := param.SampleMatrix(r[2*rLen:], param.m, param.n)
@@ -125,10 +125,10 @@ func (param *Parameters) Decaps(ct *EncapsCipherText, sk *EncapsSecretKey) (ss [
 	seedSE = append(seedSE, []byte{0x96}...)
 	seedSE = append(seedSE, seed[:param.l]...)
 
-	rLen := (2*param.no + param.n) * param.m * 4
+	rLen := (2*param.no + param.n) * param.m * 2
 	r := param.shake(seedSE, rLen)
 
-	rLen = param.m * param.no * 4
+	rLen = param.m * param.no * 2
 	S1 := param.SampleMatrix(r[:rLen], param.m, param.no)
 	E1 := param.SampleMatrix(r[rLen:2*rLen], param.m, param.no)
 	E2 := param.SampleMatrix(r[2*rLen:], param.m, param.n)

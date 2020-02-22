@@ -176,14 +176,14 @@ func (param *Parameters) SampleMatrix(r []byte, n1, n2 int) [][]uint16 {
 	for i := 0; i < n1; i++ {
 		E[i] = make([]uint16, n2)
 		for j := 0; j < n2; j++ {
-			t := binary.LittleEndian.Uint32(r[4*(i*n2+j):])
-			d := uint32(0)
+			t, d := binary.LittleEndian.Uint16(r[2*(i*n2+j):]), uint32(0)
+			r := (uint32(t) << 8) + uint32(t)
 			for j := uint(0); j < 8; j++ {
-				d += (t >> j) & 0x01010101
+				d += (r << j) & 0x01010101
 			}
 			a := ((d >> 8) & 0xff) + (d & 0xff)
 			b := (d >> 24) + ((d >> 16) & 0xff)
-			E[i][j] = 0xffff - uint16(b) + uint16(a) + 1
+			E[i][j] = 0xfffd - uint16(a) + uint16(b)
 		}
 	}
 
